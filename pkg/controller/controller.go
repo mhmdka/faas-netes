@@ -38,11 +38,11 @@ const (
 	// SuccessSynced is used as part of the Event 'reason' when a Function is synced
 	SuccessSynced = "Synced"
 	// ErrResourceExists is used as part of the Event 'reason' when a Function fails
-	// to sync due to a Deployment of the same name already existing.
+	// to sync due to a statefulset of the same name already existing.
 	ErrResourceExists = "ErrResourceExists"
 
 	// MessageResourceExists is the message used for Events when a resource
-	// fails to sync due to a Deployment already existing
+	// fails to sync due to a statefulset already existing
 	MessageResourceExists = "Resource %q already exists and is not managed by OpenFaaS"
 	// MessageResourceSynced is the message used for an Event fired when a Function
 	// is synced successfully
@@ -56,8 +56,8 @@ type Controller struct {
 	// faasclientset is a clientset for our own API group
 	faasclientset clientset.Interface
 
-	deploymentsLister appslisters.DeploymentLister
-	deploymentsSynced cache.InformerSynced
+	statefulSetLister appslisters.StatefulSetLister
+	statefulsetsSynced cache.InformerSynced
 	functionsLister   listers.FunctionLister
 	functionsSynced   cache.InformerSynced
 
@@ -83,8 +83,8 @@ func NewController(
 	faasInformerFactory informers.SharedInformerFactory,
 	factory FunctionFactory) *Controller {
 
-	// obtain references to shared index informers for the Deployment and Function types
-	deploymentInformer := kubeInformerFactory.Apps().V1().Deployments()
+	// obtain references to shared index informers for the statefulset and Function types
+	statefulsetInformer := kubeInformerFactory.Apps().V1().StatefulSets()
 	faasInformer := faasInformerFactory.Openfaas().V1().Functions()
 
 	// Create event broadcaster
@@ -100,8 +100,8 @@ func NewController(
 	controller := &Controller{
 		kubeclientset:     kubeclientset,
 		faasclientset:     faasclientset,
-		deploymentsLister: deploymentInformer.Lister(),
-		deploymentsSynced: deploymentInformer.Informer().HasSynced,
+		statefulSetLister: statefulsetInformer.Lister(),
+		statefulsetsSynced: statefulsetInformer.Informer().HasSynced,
 		functionsLister:   faasInformer.Lister(),
 		functionsSynced:   faasInformer.Informer().HasSynced,
 		workqueue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Functions"),
@@ -121,7 +121,7 @@ func NewController(
 		},
 	})
 
-	// Set up an event handler for when functions related resources like pods, deployments, replica sets
+	// Set up an event handler for when functions related resources like pods, statefulsets, replica sets
 	// can't be materialized. This logs abnormal events like ImagePullBackOff, back-off restarting failed container,
 	// failed to start container, oci runtime errors, etc
 	// Enable this with -v=3
@@ -153,7 +153,7 @@ func (c *Controller) Run(threadiness int, stopCh <-chan struct{}) error {
 	// Start the informer factories to begin populating the informer caches
 	// Wait for the caches to be synced before starting workers
 	glog.Info("Waiting for informer caches to sync")
-	if ok := cache.WaitForCacheSync(stopCh, c.deploymentsSynced, c.functionsSynced); !ok {
+	if ok := cache.WaitForCacheSync(stopCh, c.statefulsetsSynced, c.functionsSynced); !ok {
 		return fmt.Errorf("failed to wait for caches to sync")
 	}
 
@@ -232,17 +232,17 @@ func (c *Controller) syncHandler(key string) error {
 		return err
 	}
 
-	deploymentName := function.Spec.Name
-	if deploymentName == "" {
+	statefulsetName := function.Spec.Name
+	if statefulsetName == "" {
 		// We choose to absorb the error here as the worker would requeue the
 		// resource otherwise. Instead, the next time the resource is updated
 		// the resource will be queued again.
-		runtime.HandleError(fmt.Errorf("%s: deployment name must be specified", key))
+		runtime.HandleError(fmt.Errorf("%s: statefulset name must be specified", key))
 		return nil
 	}
 
-	// Get the deployment with the name specified in Function.spec
-	deployment, err := c.deploymentsLister.Deployments(function.Namespace).Get(deploymentName)
+	// Get the statefulset with the name specified in Function.spec
+	statefulset, err := c.statefulSetLister.StatefulSets(function.Namespace).Get(statefulsetName)
 	// If the resource doesn't exist, we'll create it
 	if errors.IsNotFound(err) {
 		err = nil
@@ -251,10 +251,10 @@ func (c *Controller) syncHandler(key string) error {
 			return err
 		}
 
-		glog.Infof("Creating deployment for '%s'", function.Spec.Name)
-		deployment, err = c.kubeclientset.AppsV1().Deployments(function.Namespace).Create(
+		glog.Infof("Creating statefulset for '%s'", function.Spec.Name)
+		statefulset, err = c.kubeclientset.AppsV1().StatefulSets(function.Namespace).Create(
 			context.TODO(),
-			newDeployment(function, deployment, existingSecrets, c.factory),
+			newStatefulSet(function, statefulset, existingSecrets, c.factory),
 			metav1.CreateOptions{},
 		)
 		if err != nil {
@@ -263,7 +263,7 @@ func (c *Controller) syncHandler(key string) error {
 	}
 
 	svcGetOptions := metav1.GetOptions{}
-	_, getSvcErr := c.kubeclientset.CoreV1().Services(function.Namespace).Get(context.TODO(), deploymentName, svcGetOptions)
+	_, getSvcErr := c.kubeclientset.CoreV1().Services(function.Namespace).Get(context.TODO(), statefulsetName, svcGetOptions)
 	if errors.IsNotFound(getSvcErr) {
 		glog.Infof("Creating ClusterIP service for '%s'", function.Spec.Name)
 		if _, err := c.kubeclientset.CoreV1().Services(function.Namespace).Create(context.TODO(), newService(function), metav1.CreateOptions{}); err != nil {
@@ -284,31 +284,31 @@ func (c *Controller) syncHandler(key string) error {
 		return fmt.Errorf("transient error: %v", err)
 	}
 
-	// If the Deployment is not controlled by this Function resource, we should log
+	// If the statefulset is not controlled by this Function resource, we should log
 	// a warning to the event recorder and ret
-	if !metav1.IsControlledBy(deployment, function) {
-		msg := fmt.Sprintf(MessageResourceExists, deployment.Name)
+	if !metav1.IsControlledBy(statefulset, function) {
+		msg := fmt.Sprintf(MessageResourceExists, statefulset.Name)
 		c.recorder.Event(function, corev1.EventTypeWarning, ErrResourceExists, msg)
 		return fmt.Errorf(msg)
 	}
 
-	// Update the Deployment resource if the Function definition differs
-	if deploymentNeedsUpdate(function, deployment) {
-		glog.Infof("Updating deployment for '%s'", function.Spec.Name)
+	// Update the statefulset resource if the Function definition differs
+	if statefulsetNeedsUpdate(function, statefulset) {
+		glog.Infof("Updating statefulset for '%s'", function.Spec.Name)
 
 		existingSecrets, err := c.getSecrets(function.Namespace, function.Spec.Secrets)
 		if err != nil {
 			return err
 		}
 
-		deployment, err = c.kubeclientset.AppsV1().Deployments(function.Namespace).Update(
+		statefulset, err = c.kubeclientset.AppsV1().StatefulSets(function.Namespace).Update(
 			context.TODO(),
-			newDeployment(function, deployment, existingSecrets, c.factory),
+			newStatefulSet(function, statefulset, existingSecrets, c.factory),
 			metav1.UpdateOptions{},
 		)
 
 		if err != nil {
-			glog.Errorf("Updating deployment for '%s' failed: %v", function.Spec.Name, err)
+			glog.Errorf("Updating statefulset for '%s' failed: %v", function.Spec.Name, err)
 		}
 
 		existingService, err := c.kubeclientset.CoreV1().Services(function.Namespace).Get(context.TODO(), function.Spec.Name, metav1.GetOptions{})
@@ -404,8 +404,8 @@ func (c *Controller) getSecrets(namespace string, secretNames []string) (map[str
 }
 
 // getReplicas returns the desired number of replicas for a function taking into account
-// the min replicas label, HPA, the OF autoscaler and scaled to zero deployments
-func getReplicas(function *faasv1.Function, deployment *appsv1.Deployment) *int32 {
+// the min replicas label, HPA, the OF autoscaler and scaled to zero statefulsets
+func getReplicas(function *faasv1.Function, statefulset *appsv1.StatefulSet) *int32 {
 	var minReplicas *int32
 
 	// extract min replicas from label if specified
@@ -419,37 +419,37 @@ func getReplicas(function *faasv1.Function, deployment *appsv1.Deployment) *int3
 		}
 	}
 
-	// extract current deployment replicas if specified
-	var deploymentReplicas *int32
-	if deployment != nil {
-		deploymentReplicas = deployment.Spec.Replicas
+	// extract current statefulset replicas if specified
+	var statefulsetReplicas *int32
+	if statefulset != nil {
+		statefulsetReplicas = statefulset.Spec.Replicas
 	}
 
 	// do not set replicas if min replicas is not set
-	// and current deployment has no replicas count
-	if minReplicas == nil && deploymentReplicas == nil {
+	// and current statefulset has no replicas count
+	if minReplicas == nil && statefulsetReplicas == nil {
 		return nil
 	}
 
-	// set replicas to min if deployment has no replicas and min replicas exists
-	if minReplicas != nil && deploymentReplicas == nil {
+	// set replicas to min if statefulset has no replicas and min replicas exists
+	if minReplicas != nil && statefulsetReplicas == nil {
 		return minReplicas
 	}
 
-	// do not override replicas when deployment is scaled to zero
-	if deploymentReplicas != nil && *deploymentReplicas == 0 {
-		return deploymentReplicas
+	// do not override replicas when statefulset is scaled to zero
+	if statefulsetReplicas != nil && *statefulsetReplicas == 0 {
+		return statefulsetReplicas
 	}
 
 	// do not override replicas when min is not specified
-	if minReplicas == nil && deploymentReplicas != nil {
-		return deploymentReplicas
+	if minReplicas == nil && statefulsetReplicas != nil {
+		return statefulsetReplicas
 	}
 
 	// do not override HPA or OF autoscaler replicas if the value is greater than min
-	if minReplicas != nil && deploymentReplicas != nil {
-		if *deploymentReplicas >= *minReplicas {
-			return deploymentReplicas
+	if minReplicas != nil && statefulsetReplicas != nil {
+		if *statefulsetReplicas >= *minReplicas {
+			return statefulsetReplicas
 		}
 	}
 

@@ -63,21 +63,21 @@ func MakeReplicaUpdater(defaultNamespace string, clientset *kubernetes.Clientset
 
 		options := metav1.GetOptions{
 			TypeMeta: metav1.TypeMeta{
-				Kind:       "Deployment",
+				Kind:       "StatefulSet",
 				APIVersion: "apps/v1",
 			},
 		}
 
-		deployment, err := clientset.AppsV1().Deployments(lookupNamespace).Get(context.TODO(), functionName, options)
+		statefulset, err := clientset.AppsV1().StatefulSets(lookupNamespace).Get(context.TODO(), functionName, options)
 
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("Unable to lookup function deployment " + functionName))
+			w.Write([]byte("Unable to lookup function statefulset " + functionName))
 			log.Println(err)
 			return
 		}
 
-		oldReplicas := *deployment.Spec.Replicas
+		oldReplicas := *statefulset.Spec.Replicas
 		replicas := int32(req.Replicas)
 		if replicas >= MaxReplicas {
 			replicas = MaxReplicas
@@ -85,13 +85,13 @@ func MakeReplicaUpdater(defaultNamespace string, clientset *kubernetes.Clientset
 
 		log.Printf("Set replicas - %s %s, %d/%d\n", functionName, lookupNamespace, replicas, oldReplicas)
 
-		deployment.Spec.Replicas = &replicas
+		statefulset.Spec.Replicas = &replicas
 
-		if _, err = clientset.AppsV1().Deployments(lookupNamespace).
-			Update(context.TODO(), deployment, metav1.UpdateOptions{}); err != nil {
+		if _, err = clientset.AppsV1().StatefulSets(lookupNamespace).
+			Update(context.TODO(), statefulset, metav1.UpdateOptions{}); err != nil {
 
-			log.Printf("unable to update function deployment: %s, %s", functionName, err)
-			http.Error(w, fmt.Sprintf("unable to update function deployment: %s", functionName), http.StatusInternalServerError)
+			log.Printf("unable to update function statefulset: %s, %s", functionName, err)
+			http.Error(w, fmt.Sprintf("unable to update function statefulset: %s", functionName), http.StatusInternalServerError)
 			return
 		}
 

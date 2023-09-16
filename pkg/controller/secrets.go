@@ -12,11 +12,11 @@ const (
 	secretsMountPath = "/var/openfaas/secrets"
 )
 
-// UpdateSecrets will update the Deployment spec to include secrets that have been deployed
+// UpdateSecrets will update the statefulset spec to include secrets that have been deployed
 // in the kubernetes cluster.  For each requested secret, we inspect the type and add it to the
-// deployment spec as appropriate: secrets with type `SecretTypeDockercfg` are added as ImagePullSecrets
-// all other secrets are mounted as files in the deployments containers.
-func UpdateSecrets(function *faasv1.Function, deployment *appsv1.Deployment, existingSecrets map[string]*corev1.Secret) error {
+// statefulset spec as appropriate: secrets with type `SecretTypeDockercfg` are added as ImagePullSecrets
+// all other secrets are mounted as files in the statefulsets containers.
+func UpdateSecrets(function *faasv1.Function, statefulset *appsv1.StatefulSet, existingSecrets map[string]*corev1.Secret) error {
 	// Add / reference pre-existing secrets within Kubernetes
 	secretVolumeProjections := []corev1.VolumeProjection{}
 
@@ -31,8 +31,8 @@ func UpdateSecrets(function *faasv1.Function, deployment *appsv1.Deployment, exi
 		case corev1.SecretTypeDockercfg,
 			corev1.SecretTypeDockerConfigJson:
 
-			deployment.Spec.Template.Spec.ImagePullSecrets = append(
-				deployment.Spec.Template.Spec.ImagePullSecrets,
+			statefulset.Spec.Template.Spec.ImagePullSecrets = append(
+				statefulset.Spec.Template.Spec.ImagePullSecrets,
 				corev1.LocalObjectReference{
 					Name: secretName,
 				},
@@ -66,15 +66,15 @@ func UpdateSecrets(function *faasv1.Function, deployment *appsv1.Deployment, exi
 
 	// remove the existing secrets volume, if we can find it. The update volume will be
 	// added below
-	existingVolumes := removeVolume(volumeName, deployment.Spec.Template.Spec.Volumes)
-	deployment.Spec.Template.Spec.Volumes = existingVolumes
+	existingVolumes := removeVolume(volumeName, statefulset.Spec.Template.Spec.Volumes)
+	statefulset.Spec.Template.Spec.Volumes = existingVolumes
 	if len(secretVolumeProjections) > 0 {
-		deployment.Spec.Template.Spec.Volumes = append(existingVolumes, projectedSecrets)
+		statefulset.Spec.Template.Spec.Volumes = append(existingVolumes, projectedSecrets)
 	}
 
 	// add mount secret as a file
 	updatedContainers := []corev1.Container{}
-	for _, container := range deployment.Spec.Template.Spec.Containers {
+	for _, container := range statefulset.Spec.Template.Spec.Containers {
 		mount := corev1.VolumeMount{
 			Name:      volumeName,
 			ReadOnly:  true,
@@ -89,7 +89,7 @@ func UpdateSecrets(function *faasv1.Function, deployment *appsv1.Deployment, exi
 		updatedContainers = append(updatedContainers, container)
 	}
 
-	deployment.Spec.Template.Spec.Containers = updatedContainers
+	statefulset.Spec.Template.Spec.Containers = updatedContainers
 
 	return nil
 }

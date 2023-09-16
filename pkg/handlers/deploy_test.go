@@ -134,12 +134,12 @@ func Test_SetNonRootUser(t *testing.T) {
 				ReadinessProbe: &k8s.ProbeConfig{},
 				SetNonRootUser: s.setNonRoot,
 			}, nil)
-			deployment, err := makeDeploymentSpec(request, map[string]*apiv1.Secret{}, factory)
+			statefulset, err := makeStatefulSetSpec(request, map[string]*apiv1.Secret{}, factory)
 			if err != nil {
-				t.Errorf("unexpected makeDeploymentSpec error: %s", err.Error())
+				t.Errorf("unexpected makeStatefulsetSpec error: %s", err.Error())
 			}
 
-			functionContainer := deployment.Spec.Template.Spec.Containers[0]
+			functionContainer := statefulset.Spec.Template.Spec.Containers[0]
 			if functionContainer.SecurityContext == nil {
 				t.Errorf("expected container %s to have a non-nil security context", functionContainer.Name)
 			}

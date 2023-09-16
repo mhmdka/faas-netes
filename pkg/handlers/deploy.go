@@ -72,41 +72,41 @@ func MakeDeployHandler(functionNamespace string, factory k8s.FunctionFactory) ht
 			return
 		}
 
-		deploymentSpec, specErr := makeDeploymentSpec(request, existingSecrets, factory)
+		statefulsetSpec, specErr := makeStatefulSetSpec(request, existingSecrets, factory)
 
 		var profileList []k8s.Profile
 		if request.Annotations != nil {
 			profileNamespace := factory.Config.ProfilesNamespace
 			profileList, err = factory.GetProfiles(ctx, profileNamespace, *request.Annotations)
 			if err != nil {
-				wrappedErr := fmt.Errorf("failed create Deployment spec: %s", err.Error())
+				wrappedErr := fmt.Errorf("failed create Statefulset spec: %s", err.Error())
 				log.Println(wrappedErr)
 				http.Error(w, wrappedErr.Error(), http.StatusBadRequest)
 				return
 			}
 		}
 		for _, profile := range profileList {
-			factory.ApplyProfile(profile, deploymentSpec)
+			factory.ApplyProfile(profile, statefulsetSpec)
 		}
 
 		if specErr != nil {
-			wrappedErr := fmt.Errorf("failed create Deployment spec: %s", specErr.Error())
+			wrappedErr := fmt.Errorf("failed create statefulset spec: %s", specErr.Error())
 			log.Println(wrappedErr)
 			http.Error(w, wrappedErr.Error(), http.StatusBadRequest)
 			return
 		}
 
-		deploy := factory.Client.AppsV1().Deployments(namespace)
+		deploy := factory.Client.AppsV1().StatefulSets(namespace)
 
-		_, err = deploy.Create(context.TODO(), deploymentSpec, metav1.CreateOptions{})
+		_, err = deploy.Create(context.TODO(), statefulsetSpec, metav1.CreateOptions{})
 		if err != nil {
-			wrappedErr := fmt.Errorf("unable create Deployment: %s", err.Error())
+			wrappedErr := fmt.Errorf("unable create Statefulset: %s", err.Error())
 			log.Println(wrappedErr)
 			http.Error(w, wrappedErr.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		log.Printf("Deployment created: %s.%s\n", request.Service, namespace)
+		log.Printf("Statefulset created: %s.%s\n", request.Service, namespace)
 
 		service := factory.Client.CoreV1().Services(namespace)
 		serviceSpec, err := makeServiceSpec(request, factory)
@@ -130,12 +130,11 @@ func MakeDeployHandler(functionNamespace string, factory k8s.FunctionFactory) ht
 	}
 }
 
-func makeDeploymentSpec(request types.FunctionDeployment, existingSecrets map[string]*corev1.Secret, factory k8s.FunctionFactory) (*appsv1.Deployment, error) {
+func makeStatefulSetSpec(request types.FunctionDeployment, existingSecrets map[string]*corev1.Secret, factory k8s.FunctionFactory) (*appsv1.StatefulSet, error) {
 	envVars := buildEnvVars(&request)
-
 	initialReplicas := int32p(initialReplicasCount)
 	labels := map[string]string{
-		"faas_function": request.Service,
+		"faas_function": request.Service, 
 	}
 
 	if request.Labels != nil {
@@ -165,31 +164,23 @@ func makeDeploymentSpec(request types.FunctionDeployment, existingSecrets map[st
 		return nil, err
 	}
 
-	deploymentSpec := &appsv1.Deployment{
+	statefulSetSpec := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        request.Service,
 			Annotations: annotations,
-			Labels: map[string]string{
-				"faas_function": request.Service,
-			},
+			Labels: labels,
 		},
-		Spec: appsv1.DeploymentSpec{
+		Spec: appsv1.StatefulSetSpec{
 			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					"faas_function": request.Service,
-				},
+				MatchLabels: labels,
 			},
 			Replicas: initialReplicas,
-			Strategy: appsv1.DeploymentStrategy{
-				Type: appsv1.RollingUpdateDeploymentStrategyType,
-				RollingUpdate: &appsv1.RollingUpdateDeployment{
+			UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+				Type: appsv1.RollingUpdateStatefulSetStrategyType,
+				RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
 					MaxUnavailable: &intstr.IntOrString{
-						Type:   intstr.Int,
+						Type: intstr.Int,
 						IntVal: int32(0),
-					},
-					MaxSurge: &intstr.IntOrString{
-						Type:   intstr.Int,
-						IntVal: int32(1),
 					},
 				},
 			},
@@ -215,7 +206,7 @@ func makeDeploymentSpec(request types.FunctionDeployment, existingSecrets map[st
 							},
 							Env:             envVars,
 							Resources:       *resources,
-							ImagePullPolicy: corev1.PullAlways,
+							ImagePullPolicy: corev1.PullIfNotPresent,
 							LivenessProbe:   probes.Liveness,
 							ReadinessProbe:  probes.Readiness,
 							SecurityContext: &corev1.SecurityContext{
@@ -230,15 +221,16 @@ func makeDeploymentSpec(request types.FunctionDeployment, existingSecrets map[st
 		},
 	}
 
-	factory.ConfigureReadOnlyRootFilesystem(request, deploymentSpec)
-	factory.ConfigureContainerUserID(deploymentSpec)
+	factory.ConfigureReadOnlyRootFilesystem(request, statefulSetSpec)
+	factory.ConfigureContainerUserID(statefulSetSpec)
 
-	if err := factory.ConfigureSecrets(request, deploymentSpec, existingSecrets); err != nil {
+	if err := factory.ConfigureSecrets(request, statefulSetSpec, existingSecrets); err != nil {
 		return nil, err
 	}
 
-	return deploymentSpec, nil
+	return statefulSetSpec, nil
 }
+
 
 func makeServiceSpec(request types.FunctionDeployment, factory k8s.FunctionFactory) (*corev1.Service, error) {
 	annotations, err := buildAnnotations(request)

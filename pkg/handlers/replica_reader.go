@@ -20,10 +20,10 @@ import (
 )
 
 // MaxReplicas licensed for OpenFaaS CE is 5/5
-const MaxReplicas = 5
+const MaxReplicas = 20000
 
-// MakeReplicaReader reads the amount of replicas for a deployment
-func MakeReplicaReader(defaultNamespace string, lister v1.DeploymentLister) http.HandlerFunc {
+// MakeReplicaReader reads the amount of replicas for a statefulset
+func MakeReplicaReader(defaultNamespace string, lister v1.StatefulSetLister) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		vars := mux.Vars(r)
@@ -75,9 +75,9 @@ func MakeReplicaReader(defaultNamespace string, lister v1.DeploymentLister) http
 }
 
 // getService returns a function/service or nil if not found
-func getService(functionNamespace string, functionName string, lister v1.DeploymentLister) (*types.FunctionStatus, error) {
+func getService(functionNamespace string, functionName string, lister v1.StatefulSetLister) (*types.FunctionStatus, error) {
 
-	item, err := lister.Deployments(functionNamespace).
+	item, err := lister.StatefulSets(functionNamespace).
 		Get(functionName)
 
 	if err != nil {

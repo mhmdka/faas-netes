@@ -14,49 +14,49 @@ func Test_Replicas(t *testing.T) {
 	scenarios := []struct {
 		name     string
 		function *faasv1.Function
-		deploy   *appsv1.Deployment
+		deploy   *appsv1.StatefulSet
 		expected *int32
 	}{
 		{
-			"return nil replicas when label is missing and deployment does not exist",
+			"return nil replicas when label is missing and statefulset does not exist",
 			&faasv1.Function{},
 			nil,
 			nil,
 		},
 		{
-			"return nil replicas when label is missing and deployment has no replicas",
+			"return nil replicas when label is missing and statefulset has no replicas",
 			&faasv1.Function{},
-			&appsv1.Deployment{},
+			&appsv1.StatefulSet{},
 			nil,
 		},
 		{
-			"return min replicas when label is present and deployment has nil replicas",
+			"return min replicas when label is present and statefulset has nil replicas",
 			&faasv1.Function{Spec: faasv1.FunctionSpec{Labels: &map[string]string{LabelMinReplicas: "2"}}},
-			&appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: nil}},
+			&appsv1.StatefulSet{Spec: appsv1.StatefulSetSpec{Replicas: nil}},
 			int32p(2),
 		},
 		{
-			"return min replicas when label is present and deployment has replicas less than min",
+			"return min replicas when label is present and statefulset has replicas less than min",
 			&faasv1.Function{Spec: faasv1.FunctionSpec{Labels: &map[string]string{LabelMinReplicas: "2"}}},
-			&appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: int32p(1)}},
+			&appsv1.StatefulSet{Spec: appsv1.StatefulSetSpec{Replicas: int32p(1)}},
 			int32p(2),
 		},
 		{
-			"return existing replicas when label is present and deployment has more replicas than min",
+			"return existing replicas when label is present and statefulset has more replicas than min",
 			&faasv1.Function{Spec: faasv1.FunctionSpec{Labels: &map[string]string{LabelMinReplicas: "2"}}},
-			&appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: int32p(3)}},
+			&appsv1.StatefulSet{Spec: appsv1.StatefulSetSpec{Replicas: int32p(3)}},
 			int32p(3),
 		},
 		{
-			"return existing replicas when label is missing and deployment has replicas set by HPA",
+			"return existing replicas when label is missing and statefulset has replicas set by HPA",
 			&faasv1.Function{Spec: faasv1.FunctionSpec{}},
-			&appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: int32p(3)}},
+			&appsv1.StatefulSet{Spec: appsv1.StatefulSetSpec{Replicas: int32p(3)}},
 			int32p(3),
 		},
 		{
-			"return zero replicas when label is present and deployment has zero replicas",
+			"return zero replicas when label is present and statefulset has zero replicas",
 			&faasv1.Function{Spec: faasv1.FunctionSpec{Labels: &map[string]string{LabelMinReplicas: "2"}}},
-			&appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: int32p(0)}},
+			&appsv1.StatefulSet{Spec: appsv1.StatefulSetSpec{Replicas: int32p(0)}},
 			int32p(0),
 		},
 	}
@@ -69,7 +69,7 @@ func Test_Replicas(t *testing.T) {
 
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) {
-			deploy := newDeployment(s.function, s.deploy, nil, factory)
+			deploy := newStatefulSet(s.function, s.deploy, nil, factory)
 			value := deploy.Spec.Replicas
 
 			if s.expected != nil && value != nil {

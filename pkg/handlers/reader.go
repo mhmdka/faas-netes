@@ -19,8 +19,8 @@ import (
 	"github.com/openfaas/faas-netes/pkg/k8s"
 )
 
-// MakeFunctionReader handler for reading functions deployed in the cluster as deployments.
-func MakeFunctionReader(defaultNamespace string, deploymentLister v1.DeploymentLister) http.HandlerFunc {
+// MakeFunctionReader handler for reading functions deployed in the cluster as statefulsets.
+func MakeFunctionReader(defaultNamespace string, statefulSetLister v1.StatefulSetLister) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		q := r.URL.Query()
@@ -42,7 +42,7 @@ func MakeFunctionReader(defaultNamespace string, deploymentLister v1.DeploymentL
 			return
 		}
 
-		functions, err := getServiceList(lookupNamespace, deploymentLister)
+		functions, err := getServiceList(lookupNamespace, statefulSetLister)
 		if err != nil {
 			log.Println(err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -64,7 +64,7 @@ func MakeFunctionReader(defaultNamespace string, deploymentLister v1.DeploymentL
 	}
 }
 
-func getServiceList(functionNamespace string, deploymentLister v1.DeploymentLister) ([]types.FunctionStatus, error) {
+func getServiceList(functionNamespace string, statefulSetLister v1.StatefulSetLister) ([]types.FunctionStatus, error) {
 	functions := []types.FunctionStatus{}
 
 	sel := labels.NewSelector()
@@ -74,7 +74,7 @@ func getServiceList(functionNamespace string, deploymentLister v1.DeploymentList
 	}
 	onlyFunctions := sel.Add(*req)
 
-	res, err := deploymentLister.Deployments(functionNamespace).List(onlyFunctions)
+	res, err := statefulSetLister.StatefulSets(functionNamespace).List(onlyFunctions)
 
 	if err != nil {
 		return nil, err

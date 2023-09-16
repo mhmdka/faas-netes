@@ -22,8 +22,8 @@ func Test_UpdateSecrets_DoesNotAddVolumeIfRequestSecretsIsNil(t *testing.T) {
 		"testsecret": {Type: corev1.SecretTypeOpaque, Data: map[string][]byte{"filename": []byte("contents")}},
 	}
 
-	deployment := &appsv1.Deployment{
-		Spec: appsv1.DeploymentSpec{
+	statefulset := &appsv1.StatefulSet{
+		Spec: appsv1.StatefulSetSpec{
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -33,12 +33,12 @@ func Test_UpdateSecrets_DoesNotAddVolumeIfRequestSecretsIsNil(t *testing.T) {
 			},
 		},
 	}
-	err := UpdateSecrets(request, deployment, existingSecrets)
+	err := UpdateSecrets(request, statefulset, existingSecrets)
 	if err != nil {
 		t.Errorf("unexpected error %s", err.Error())
 	}
 
-	validateEmptySecretVolumesAndMounts(t, deployment)
+	validateEmptySecretVolumesAndMounts(t, statefulset)
 
 }
 
@@ -54,8 +54,8 @@ func Test_UpdateSecrets_DoesNotAddVolumeIfRequestSecretsIsEmpty(t *testing.T) {
 		"testsecret": {Type: corev1.SecretTypeOpaque, Data: map[string][]byte{"filename": []byte("contents")}},
 	}
 
-	deployment := &appsv1.Deployment{
-		Spec: appsv1.DeploymentSpec{
+	statefulset := &appsv1.StatefulSet{
+		Spec: appsv1.StatefulSetSpec{
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -65,12 +65,12 @@ func Test_UpdateSecrets_DoesNotAddVolumeIfRequestSecretsIsEmpty(t *testing.T) {
 			},
 		},
 	}
-	err := UpdateSecrets(request, deployment, existingSecrets)
+	err := UpdateSecrets(request, statefulset, existingSecrets)
 	if err != nil {
 		t.Errorf("unexpected error %s", err.Error())
 	}
 
-	validateEmptySecretVolumesAndMounts(t, deployment)
+	validateEmptySecretVolumesAndMounts(t, statefulset)
 
 }
 
@@ -87,8 +87,8 @@ func Test_UpdateSecrets_RemovesAllCopiesOfExitingSecretsVolumes(t *testing.T) {
 		"testsecret": {Type: corev1.SecretTypeOpaque, Data: map[string][]byte{"filename": []byte("contents")}},
 	}
 
-	deployment := &appsv1.Deployment{
-		Spec: appsv1.DeploymentSpec{
+	statefulset := &appsv1.StatefulSet{
+		Spec: appsv1.StatefulSetSpec{
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -117,12 +117,12 @@ func Test_UpdateSecrets_RemovesAllCopiesOfExitingSecretsVolumes(t *testing.T) {
 			},
 		},
 	}
-	err := UpdateSecrets(request, deployment, existingSecrets)
+	err := UpdateSecrets(request, statefulset, existingSecrets)
 	if err != nil {
 		t.Errorf("unexpected error %s", err.Error())
 	}
 
-	validateEmptySecretVolumesAndMounts(t, deployment)
+	validateEmptySecretVolumesAndMounts(t, statefulset)
 
 }
 
@@ -138,8 +138,8 @@ func Test_UpdateSecrets_AddNewSecretVolume(t *testing.T) {
 		"testsecret": {Type: corev1.SecretTypeOpaque, Data: map[string][]byte{"filename": []byte("contents")}},
 	}
 
-	deployment := &appsv1.Deployment{
-		Spec: appsv1.DeploymentSpec{
+	statefulset := &appsv1.StatefulSet{
+		Spec: appsv1.StatefulSetSpec{
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -149,12 +149,12 @@ func Test_UpdateSecrets_AddNewSecretVolume(t *testing.T) {
 			},
 		},
 	}
-	err := UpdateSecrets(request, deployment, existingSecrets)
+	err := UpdateSecrets(request, statefulset, existingSecrets)
 	if err != nil {
 		t.Errorf("unexpected error %s", err.Error())
 	}
 
-	validateNewSecretVolumesAndMounts(t, deployment)
+	validateNewSecretVolumesAndMounts(t, statefulset)
 
 }
 
@@ -170,8 +170,8 @@ func Test_UpdateSecrets_ReplacesPreviousSecretMountWithNewMount(t *testing.T) {
 		"testsecret": {Type: corev1.SecretTypeOpaque, Data: map[string][]byte{"filename": []byte("contents")}},
 	}
 
-	deployment := &appsv1.Deployment{
-		Spec: appsv1.DeploymentSpec{
+	statefulset := &appsv1.StatefulSet{
+		Spec: appsv1.StatefulSetSpec{
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -181,19 +181,19 @@ func Test_UpdateSecrets_ReplacesPreviousSecretMountWithNewMount(t *testing.T) {
 			},
 		},
 	}
-	err := UpdateSecrets(request, deployment, existingSecrets)
+	err := UpdateSecrets(request, statefulset, existingSecrets)
 	if err != nil {
 		t.Errorf("unexpected error %s", err.Error())
 	}
-	// mimic the deployment already existing and deployed with the same secrets by running
-	// UpdateSecrets twice, the first run represents the original deployment, the second run represents
-	// retrieving the deployment from the k8s api and applying the update to it
-	err = UpdateSecrets(request, deployment, existingSecrets)
+	// mimic the statefulset already existing and deployed with the same secrets by running
+	// UpdateSecrets twice, the first run represents the original statefulset, the second run represents
+	// retrieving the statefulset from the k8s api and applying the update to it
+	err = UpdateSecrets(request, statefulset, existingSecrets)
 	if err != nil {
 		t.Errorf("unexpected error %s", err.Error())
 	}
 
-	validateNewSecretVolumesAndMounts(t, deployment)
+	validateNewSecretVolumesAndMounts(t, statefulset)
 
 }
 
@@ -209,8 +209,8 @@ func Test_UpdateSecrets_RemovesSecretsVolumeIfRequestSecretsIsEmptyOrNil(t *test
 		"testsecret": {Type: corev1.SecretTypeOpaque, Data: map[string][]byte{"filename": []byte("contents")}},
 	}
 
-	deployment := &appsv1.Deployment{
-		Spec: appsv1.DeploymentSpec{
+	statefulset := &appsv1.StatefulSet{
+		Spec: appsv1.StatefulSetSpec{
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -220,12 +220,12 @@ func Test_UpdateSecrets_RemovesSecretsVolumeIfRequestSecretsIsEmptyOrNil(t *test
 			},
 		},
 	}
-	err := UpdateSecrets(request, deployment, existingSecrets)
+	err := UpdateSecrets(request, statefulset, existingSecrets)
 	if err != nil {
 		t.Errorf("unexpected error %s", err.Error())
 	}
 
-	validateNewSecretVolumesAndMounts(t, deployment)
+	validateNewSecretVolumesAndMounts(t, statefulset)
 
 	request = &faasv1.Function{
 		Spec: faasv1.FunctionSpec{
@@ -233,35 +233,35 @@ func Test_UpdateSecrets_RemovesSecretsVolumeIfRequestSecretsIsEmptyOrNil(t *test
 			Secrets: []string{},
 		},
 	}
-	err = UpdateSecrets(request, deployment, existingSecrets)
+	err = UpdateSecrets(request, statefulset, existingSecrets)
 	if err != nil {
 		t.Errorf("unexpected error %s", err.Error())
 	}
 
-	validateEmptySecretVolumesAndMounts(t, deployment)
+	validateEmptySecretVolumesAndMounts(t, statefulset)
 }
 
-func validateEmptySecretVolumesAndMounts(t *testing.T, deployment *appsv1.Deployment) {
-	numVolumes := len(deployment.Spec.Template.Spec.Volumes)
+func validateEmptySecretVolumesAndMounts(t *testing.T, statefulset *appsv1.StatefulSet) {
+	numVolumes := len(statefulset.Spec.Template.Spec.Volumes)
 	if numVolumes != 0 {
-		fmt.Printf("%+v", deployment.Spec.Template.Spec.Volumes)
+		fmt.Printf("%+v", statefulset.Spec.Template.Spec.Volumes)
 		t.Errorf("Incorrect number of volumes: expected 0, got %d", numVolumes)
 	}
 
-	c := deployment.Spec.Template.Spec.Containers[0]
+	c := statefulset.Spec.Template.Spec.Containers[0]
 	numVolumeMounts := len(c.VolumeMounts)
 	if numVolumeMounts != 0 {
 		t.Errorf("Incorrect number of volumes mounts: expected 0, got %d", numVolumeMounts)
 	}
 }
 
-func validateNewSecretVolumesAndMounts(t *testing.T, deployment *appsv1.Deployment) {
-	numVolumes := len(deployment.Spec.Template.Spec.Volumes)
+func validateNewSecretVolumesAndMounts(t *testing.T, statefulset *appsv1.StatefulSet) {
+	numVolumes := len(statefulset.Spec.Template.Spec.Volumes)
 	if numVolumes != 1 {
 		t.Errorf("Incorrect number of volumes: expected 1, got %d", numVolumes)
 	}
 
-	volume := deployment.Spec.Template.Spec.Volumes[0]
+	volume := statefulset.Spec.Template.Spec.Volumes[0]
 	if volume.Name != "testfunc-projected-secrets" {
 		t.Errorf("Incorrect volume name: expected \"testfunc-projected-secrets\", got \"%s\"", volume.Name)
 	}
@@ -274,7 +274,7 @@ func validateNewSecretVolumesAndMounts(t *testing.T, deployment *appsv1.Deployme
 		t.Error("Project secret not constructed correctly")
 	}
 
-	c := deployment.Spec.Template.Spec.Containers[0]
+	c := statefulset.Spec.Template.Spec.Containers[0]
 	numVolumeMounts := len(c.VolumeMounts)
 	if numVolumeMounts != 1 {
 		t.Errorf("Incorrect number of volumes mounts: expected 1, got %d", numVolumeMounts)

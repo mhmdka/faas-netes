@@ -137,8 +137,8 @@ func Test_TolerationsProfile_Apply(t *testing.T) {
 	}
 	p := Profile{Tolerations: expectedTolerations}
 
-	basicDeployment := &appsv1.Deployment{
-		Spec: appsv1.DeploymentSpec{
+	basicStatefulset := &appsv1.StatefulSet{
+		Spec: appsv1.StatefulSetSpec{
 			Template: apiv1.PodTemplateSpec{
 				Spec: apiv1.PodSpec{
 					Containers: []apiv1.Container{
@@ -150,8 +150,8 @@ func Test_TolerationsProfile_Apply(t *testing.T) {
 	}
 
 	factory := mockFactory()
-	factory.ApplyProfile(p, basicDeployment)
-	result := basicDeployment.Spec.Template.Spec.Tolerations
+	factory.ApplyProfile(p, basicStatefulset)
+	result := basicStatefulset.Spec.Template.Spec.Tolerations
 	if !reflect.DeepEqual(expectedTolerations, result) {
 		t.Fatalf("expected %v, got %v", expectedTolerations, result)
 	}
@@ -163,8 +163,8 @@ func Test_RunAsNonRootProfile_Apply(t *testing.T) {
 
 	p := Profile{PodSecurityContext: &corev1.PodSecurityContext{RunAsNonRoot: &truev}}
 
-	basicDeployment := &appsv1.Deployment{
-		Spec: appsv1.DeploymentSpec{
+	basicStatefulset := &appsv1.StatefulSet{
+		Spec: appsv1.StatefulSetSpec{
 			Template: apiv1.PodTemplateSpec{
 				Spec: apiv1.PodSpec{
 					Containers: []apiv1.Container{
@@ -179,8 +179,8 @@ func Test_RunAsNonRootProfile_Apply(t *testing.T) {
 	}
 
 	factory := mockFactory()
-	factory.ApplyProfile(p, basicDeployment)
-	result := basicDeployment.Spec.Template.Spec.SecurityContext.RunAsNonRoot
+	factory.ApplyProfile(p, basicStatefulset)
+	result := basicStatefulset.Spec.Template.Spec.SecurityContext.RunAsNonRoot
 	if result == nil {
 		t.Fatalf("expected %v, got nil", expectedRoot)
 	}
@@ -205,8 +205,8 @@ func Test_TolerationsProfile_Remove(t *testing.T) {
 
 	p := Profile{Tolerations: tolerations}
 
-	basicDeployment := &appsv1.Deployment{
-		Spec: appsv1.DeploymentSpec{
+	basicStatefulset := &appsv1.StatefulSet{
+		Spec: appsv1.StatefulSetSpec{
 			Template: apiv1.PodTemplateSpec{
 				Spec: apiv1.PodSpec{
 					Containers: []apiv1.Container{
@@ -219,9 +219,9 @@ func Test_TolerationsProfile_Remove(t *testing.T) {
 	}
 
 	factory := mockFactory()
-	factory.RemoveProfile(p, basicDeployment)
+	factory.RemoveProfile(p, basicStatefulset)
 
-	got := basicDeployment.Spec.Template.Spec.Tolerations
+	got := basicStatefulset.Spec.Template.Spec.Tolerations
 	expected := []corev1.Toleration{nonProfileToleration}
 	if !reflect.DeepEqual(got, expected) {
 		t.Fatalf("expected %v, got %v", expected, got)
@@ -235,8 +235,8 @@ func Test_PodSecurityProfile_Apply(t *testing.T) {
 	}
 	p := Profile{PodSecurityContext: &expectedProfile}
 
-	basicDeployment := &appsv1.Deployment{
-		Spec: appsv1.DeploymentSpec{
+	basicStatefulset := &appsv1.StatefulSet{
+		Spec: appsv1.StatefulSetSpec{
 			Template: apiv1.PodTemplateSpec{
 				Spec: apiv1.PodSpec{
 					Containers: []apiv1.Container{
@@ -248,8 +248,8 @@ func Test_PodSecurityProfile_Apply(t *testing.T) {
 	}
 
 	factory := mockFactory()
-	factory.ApplyProfile(p, basicDeployment)
-	result := basicDeployment.Spec.Template.Spec.SecurityContext
+	factory.ApplyProfile(p, basicStatefulset)
+	result := basicStatefulset.Spec.Template.Spec.SecurityContext
 	if !reflect.DeepEqual(&expectedProfile, result) {
 		t.Fatalf("expected %+v\n got %+v", &expectedProfile, result)
 	}
@@ -263,8 +263,8 @@ func Test_PodSecurityProfile_Remove(t *testing.T) {
 
 	runAsNonRoot := true
 	expectedProfile := &apiv1.PodSecurityContext{RunAsNonRoot: &runAsNonRoot}
-	basicDeployment := &appsv1.Deployment{
-		Spec: appsv1.DeploymentSpec{
+	basicStatefulset := &appsv1.StatefulSet{
+		Spec: appsv1.StatefulSetSpec{
 			Template: apiv1.PodTemplateSpec{
 				Spec: apiv1.PodSpec{
 					SecurityContext: &apiv1.PodSecurityContext{
@@ -281,8 +281,8 @@ func Test_PodSecurityProfile_Remove(t *testing.T) {
 	}
 
 	factory := mockFactory()
-	factory.RemoveProfile(p, basicDeployment)
-	result := basicDeployment.Spec.Template.Spec.SecurityContext
+	factory.RemoveProfile(p, basicStatefulset)
+	result := basicStatefulset.Spec.Template.Spec.SecurityContext
 	if !reflect.DeepEqual(expectedProfile, result) {
 		t.Fatalf("expected %+v\n got %+v", &expectedProfile, result)
 	}

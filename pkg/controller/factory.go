@@ -66,21 +66,21 @@ func (f *FunctionFactory) MakeProbes(function *faasv1.Function) (*k8s.FunctionPr
 	return f.Factory.MakeProbes(req)
 }
 
-func (f *FunctionFactory) ConfigureReadOnlyRootFilesystem(function *faasv1.Function, deployment *appsv1.Deployment) {
+func (f *FunctionFactory) ConfigureReadOnlyRootFilesystem(function *faasv1.Function, statefulset *appsv1.StatefulSet) {
 	req := functionToFunctionRequest(function)
-	f.Factory.ConfigureReadOnlyRootFilesystem(req, deployment)
+	f.Factory.ConfigureReadOnlyRootFilesystem(req, statefulset)
 }
 
-func (f *FunctionFactory) ConfigureContainerUserID(deployment *appsv1.Deployment) {
-	f.Factory.ConfigureContainerUserID(deployment)
+func (f *FunctionFactory) ConfigureContainerUserID(statefulset *appsv1.StatefulSet) {
+	f.Factory.ConfigureContainerUserID(statefulset)
 }
 
-func (f *FunctionFactory) ApplyProfile(profile k8s.Profile, deployment *appsv1.Deployment) {
-	f.Factory.ApplyProfile(profile, deployment)
+func (f *FunctionFactory) ApplyProfile(profile k8s.Profile, statefulset *appsv1.StatefulSet) {
+	f.Factory.ApplyProfile(profile, statefulset)
 }
 
-func (f *FunctionFactory) RemoveProfile(profile k8s.Profile, deployment *appsv1.Deployment) {
-	f.Factory.RemoveProfile(profile, deployment)
+func (f *FunctionFactory) RemoveProfile(profile k8s.Profile, statefulset *appsv1.StatefulSet) {
+	f.Factory.RemoveProfile(profile, statefulset)
 }
 
 func (f *FunctionFactory) GetProfiles(ctx context.Context, namespace string, annotations map[string]string) ([]k8s.Profile, error) {

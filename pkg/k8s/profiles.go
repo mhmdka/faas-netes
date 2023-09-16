@@ -118,62 +118,62 @@ func ProfilesToRemove(requested, existing map[string]string) []string {
 // ApplyProfile adds or mutates the configuration of the Deployment with the values defined
 // in the Profile. Profiles are not merged, if two profiles are applied, the last Profile will
 // override preceding Profiles with overlapping configurations.
-func (f FunctionFactory) ApplyProfile(profile Profile, deployment *appsv1.Deployment) {
+func (f FunctionFactory) ApplyProfile(profile Profile, statefulset *appsv1.StatefulSet) {
 	if len(profile.Tolerations) > 0 {
-		deployment.Spec.Template.Spec.Tolerations = append(deployment.Spec.Template.Spec.Tolerations, profile.Tolerations...)
+		statefulset.Spec.Template.Spec.Tolerations = append(statefulset.Spec.Template.Spec.Tolerations, profile.Tolerations...)
 	}
 
 	if profile.PodSecurityContext != nil {
-		if deployment.Spec.Template.Spec.SecurityContext == nil {
-			deployment.Spec.Template.Spec.SecurityContext = &corev1.PodSecurityContext{}
+		if statefulset.Spec.Template.Spec.SecurityContext == nil {
+			statefulset.Spec.Template.Spec.SecurityContext = &corev1.PodSecurityContext{}
 		}
 
-		profile.PodSecurityContext.DeepCopyInto(deployment.Spec.Template.Spec.SecurityContext)
+		profile.PodSecurityContext.DeepCopyInto(statefulset.Spec.Template.Spec.SecurityContext)
 	}
 }
 
 // RemoveProfile is the inverse of Apply, removing the mutations that the Profile would have applied
-func (f FunctionFactory) RemoveProfile(profile Profile, deployment *appsv1.Deployment) {
+func (f FunctionFactory) RemoveProfile(profile Profile, statefulset *appsv1.StatefulSet) {
 	for _, profileToleration := range profile.Tolerations {
-		// filter the existing tolerations and then update the deployment
+		// filter the existing tolerations and then update the statefulset
 		// filter without allocation implementation from
 		// https://github.com/golang/go/wiki/SliceTricks#filtering-without-allocating
-		newTolerations := deployment.Spec.Template.Spec.Tolerations[:0]
-		for _, toleration := range deployment.Spec.Template.Spec.Tolerations {
+		newTolerations := statefulset.Spec.Template.Spec.Tolerations[:0]
+		for _, toleration := range statefulset.Spec.Template.Spec.Tolerations {
 			if !reflect.DeepEqual(profileToleration, toleration) {
 				newTolerations = append(newTolerations, toleration)
 			}
 		}
 
-		deployment.Spec.Template.Spec.Tolerations = newTolerations
+		statefulset.Spec.Template.Spec.Tolerations = newTolerations
 	}
 
 	if profile.PodSecurityContext != nil {
-		sc := deployment.Spec.Template.Spec.SecurityContext
+		sc := statefulset.Spec.Template.Spec.SecurityContext
 
 		if reflect.DeepEqual(profile.PodSecurityContext.SELinuxOptions, sc.SELinuxOptions) {
-			deployment.Spec.Template.Spec.SecurityContext.SELinuxOptions = nil
+			statefulset.Spec.Template.Spec.SecurityContext.SELinuxOptions = nil
 		}
 		if reflect.DeepEqual(profile.PodSecurityContext.SELinuxOptions, sc.WindowsOptions) {
-			deployment.Spec.Template.Spec.SecurityContext.WindowsOptions = nil
+			statefulset.Spec.Template.Spec.SecurityContext.WindowsOptions = nil
 		}
 		if profile.PodSecurityContext.RunAsUser != nil {
-			deployment.Spec.Template.Spec.SecurityContext.RunAsUser = nil
+			statefulset.Spec.Template.Spec.SecurityContext.RunAsUser = nil
 		}
 		if profile.PodSecurityContext.RunAsGroup != nil {
-			deployment.Spec.Template.Spec.SecurityContext.RunAsGroup = nil
+			statefulset.Spec.Template.Spec.SecurityContext.RunAsGroup = nil
 		}
 		if profile.PodSecurityContext.RunAsNonRoot != nil {
-			deployment.Spec.Template.Spec.SecurityContext.RunAsNonRoot = nil
+			statefulset.Spec.Template.Spec.SecurityContext.RunAsNonRoot = nil
 		}
 		if profile.PodSecurityContext.SupplementalGroups != nil {
-			deployment.Spec.Template.Spec.SecurityContext.SupplementalGroups = nil
+			statefulset.Spec.Template.Spec.SecurityContext.SupplementalGroups = nil
 		}
 		if profile.PodSecurityContext.FSGroup != nil {
-			deployment.Spec.Template.Spec.SecurityContext.FSGroup = nil
+			statefulset.Spec.Template.Spec.SecurityContext.FSGroup = nil
 		}
 		if profile.PodSecurityContext.Sysctls != nil {
-			deployment.Spec.Template.Spec.SecurityContext.Sysctls = nil
+			statefulset.Spec.Template.Spec.SecurityContext.Sysctls = nil
 		}
 	}
 }

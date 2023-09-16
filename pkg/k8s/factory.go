@@ -21,7 +21,7 @@ type NamespacedProfiler interface {
 	Profiles(namespace string) v1.ProfileNamespaceLister
 }
 
-// FunctionFactory is handling Kubernetes operations to materialise functions into deployments and services
+// FunctionFactory is handling Kubernetes operations to materialise functions into statefulsets and services
 type FunctionFactory struct {
 	Client   kubernetes.Interface
 	Config   DeploymentConfig

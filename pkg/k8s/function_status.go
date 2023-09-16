@@ -11,9 +11,9 @@ import (
 // EnvProcessName is the name of the env variable containing the function process
 const EnvProcessName = "fprocess"
 
-// AsFunctionStatus reads a Deployment object into an OpenFaaS FunctionStatus, parsing the
-// Deployment and Container spec into a simplified summary of the Function
-func AsFunctionStatus(item appsv1.Deployment) *types.FunctionStatus {
+// AsFunctionStatus reads a Statefulset object into an OpenFaaS FunctionStatus, parsing the
+// Statefulset and Container spec into a simplified summary of the Function
+func AsFunctionStatus(item appsv1.StatefulSet) *types.FunctionStatus {
 	var replicas uint64
 	if item.Spec.Replicas != nil {
 		replicas = uint64(*item.Spec.Replicas)

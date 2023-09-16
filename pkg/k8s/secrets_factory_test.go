@@ -20,9 +20,9 @@ func Test_ReadFunctionSecretsSpec(t *testing.T) {
 		"pullsecret": {Type: apiv1.SecretTypeDockercfg},
 		"testsecret": {Type: apiv1.SecretTypeOpaque, Data: map[string][]byte{"filename": []byte("contents")}},
 	}
-	functionDep := appsv1.Deployment{
+	functionDep := appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "testfunc"},
-		Spec: appsv1.DeploymentSpec{
+		Spec: appsv1.StatefulSetSpec{
 			Template: apiv1.PodTemplateSpec{
 				Spec: apiv1.PodSpec{
 					Containers: []apiv1.Container{
@@ -36,7 +36,7 @@ func Test_ReadFunctionSecretsSpec(t *testing.T) {
 	cases := []struct {
 		name       string
 		req        types.FunctionDeployment
-		deployment appsv1.Deployment
+		statefulset appsv1.StatefulSet
 		expected   []string
 	}{
 		{
@@ -45,7 +45,7 @@ func Test_ReadFunctionSecretsSpec(t *testing.T) {
 				Service: "testfunc",
 				Secrets: []string{},
 			},
-			deployment: functionDep,
+			statefulset: functionDep,
 			expected:   []string{},
 		},
 		{
@@ -54,7 +54,7 @@ func Test_ReadFunctionSecretsSpec(t *testing.T) {
 				Service: "testfunc",
 				Secrets: []string{"pullsecret"},
 			},
-			deployment: functionDep,
+			statefulset: functionDep,
 			expected:   []string{"pullsecret"},
 		},
 		{
@@ -63,7 +63,7 @@ func Test_ReadFunctionSecretsSpec(t *testing.T) {
 				Service: "testfunc",
 				Secrets: []string{"testsecret"},
 			},
-			deployment: functionDep,
+			statefulset: functionDep,
 			expected:   []string{"testsecret"},
 		},
 		{
@@ -72,18 +72,18 @@ func Test_ReadFunctionSecretsSpec(t *testing.T) {
 				Service: "testfunc",
 				Secrets: []string{"testsecret", "pullsecret"},
 			},
-			deployment: functionDep,
+			statefulset: functionDep,
 			expected:   []string{"pullsecret", "testsecret"},
 		},
 	}
 
 	for _, tc := range cases {
-		err := f.ConfigureSecrets(tc.req, &tc.deployment, existingSecrets)
+		err := f.ConfigureSecrets(tc.req, &tc.statefulset, existingSecrets)
 		if err != nil {
 			t.Fatalf("unexpected error result: got %q", err)
 		}
 
-		parsedSecrets := ReadFunctionSecretsSpec(tc.deployment)
+		parsedSecrets := ReadFunctionSecretsSpec(tc.statefulset)
 		if len(tc.expected) != len(parsedSecrets) {
 			t.Fatalf("incorrect secret count, expected: %v, got: %v", tc.expected, parsedSecrets)
 		}
@@ -105,8 +105,8 @@ func Test_FunctionFactory_ConfigureSecrets(t *testing.T) {
 		"testsecret": {Type: apiv1.SecretTypeOpaque, Data: map[string][]byte{"filename": []byte("contents")}},
 	}
 
-	basicDeployment := appsv1.Deployment{
-		Spec: appsv1.DeploymentSpec{
+	basicStatefulset := appsv1.StatefulSet{
+		Spec: appsv1.StatefulSetSpec{
 			Template: apiv1.PodTemplateSpec{
 				Spec: apiv1.PodSpec{
 					Containers: []apiv1.Container{
@@ -118,8 +118,8 @@ func Test_FunctionFactory_ConfigureSecrets(t *testing.T) {
 	}
 
 	volumeName := "testfunc-projected-secrets"
-	withExistingSecret := appsv1.Deployment{
-		Spec: appsv1.DeploymentSpec{
+	withExistingSecret := appsv1.StatefulSet{
+		Spec: appsv1.StatefulSetSpec{
 			Template: apiv1.PodTemplateSpec{
 				Spec: apiv1.PodSpec{
 					Containers: []apiv1.Container{
@@ -152,8 +152,8 @@ func Test_FunctionFactory_ConfigureSecrets(t *testing.T) {
 	cases := []struct {
 		name       string
 		req        types.FunctionDeployment
-		deployment appsv1.Deployment
-		validator  func(t *testing.T, deployment *appsv1.Deployment)
+		statefulset appsv1.StatefulSet
+		validator  func(t *testing.T, statefulset *appsv1.StatefulSet)
 		err        error
 	}{
 		{
@@ -162,7 +162,7 @@ func Test_FunctionFactory_ConfigureSecrets(t *testing.T) {
 				Service: "testfunc",
 				Secrets: nil,
 			},
-			deployment: basicDeployment,
+			statefulset: basicStatefulset,
 			validator:  validateEmptySecretVolumesAndMounts,
 		},
 		{
@@ -171,7 +171,7 @@ func Test_FunctionFactory_ConfigureSecrets(t *testing.T) {
 				Service: "testfunc",
 				Secrets: []string{},
 			},
-			deployment: basicDeployment,
+			statefulset: basicStatefulset,
 			validator:  validateEmptySecretVolumesAndMounts,
 		},
 		{
@@ -180,7 +180,7 @@ func Test_FunctionFactory_ConfigureSecrets(t *testing.T) {
 				Service: "testfunc",
 				Secrets: []string{},
 			},
-			deployment: withExistingSecret,
+			statefulset: withExistingSecret,
 			validator:  validateEmptySecretVolumesAndMounts,
 		},
 		{
@@ -189,7 +189,7 @@ func Test_FunctionFactory_ConfigureSecrets(t *testing.T) {
 				Service: "testfunc",
 				Secrets: []string{"pullsecret", "testsecret"},
 			},
-			deployment: basicDeployment,
+			statefulset: basicStatefulset,
 			validator:  validateNewSecretVolumesAndMounts,
 		},
 		{
@@ -198,7 +198,7 @@ func Test_FunctionFactory_ConfigureSecrets(t *testing.T) {
 				Service: "testfunc",
 				Secrets: []string{"pullsecret", "testsecret"},
 			},
-			deployment: withExistingSecret,
+			statefulset: withExistingSecret,
 			validator:  validateNewSecretVolumesAndMounts,
 		},
 		{
@@ -207,42 +207,42 @@ func Test_FunctionFactory_ConfigureSecrets(t *testing.T) {
 				Service: "testfunc",
 				Secrets: []string{},
 			},
-			deployment: withExistingSecret,
+			statefulset: withExistingSecret,
 			validator:  validateEmptySecretVolumesAndMounts,
 		},
 	}
 
 	for _, tc := range cases {
-		err := f.ConfigureSecrets(tc.req, &tc.deployment, existingSecrets)
+		err := f.ConfigureSecrets(tc.req, &tc.statefulset, existingSecrets)
 		if err != tc.err {
 			t.Errorf("unexpected error result: got %v, expected %v", err, tc.err)
 		}
 
-		tc.validator(t, &tc.deployment)
+		tc.validator(t, &tc.statefulset)
 	}
 }
 
-func validateEmptySecretVolumesAndMounts(t *testing.T, deployment *appsv1.Deployment) {
-	numVolumes := len(deployment.Spec.Template.Spec.Volumes)
+func validateEmptySecretVolumesAndMounts(t *testing.T, statefulset *appsv1.StatefulSet) {
+	numVolumes := len(statefulset.Spec.Template.Spec.Volumes)
 	if numVolumes != 0 {
-		fmt.Printf("%+v", deployment.Spec.Template.Spec.Volumes)
+		fmt.Printf("%+v", statefulset.Spec.Template.Spec.Volumes)
 		t.Errorf("Incorrect number of volumes: expected 0, got %d", numVolumes)
 	}
 
-	c := deployment.Spec.Template.Spec.Containers[0]
+	c := statefulset.Spec.Template.Spec.Containers[0]
 	numVolumeMounts := len(c.VolumeMounts)
 	if numVolumeMounts != 0 {
 		t.Errorf("Incorrect number of volumes mounts: expected 0, got %d", numVolumeMounts)
 	}
 }
 
-func validateNewSecretVolumesAndMounts(t *testing.T, deployment *appsv1.Deployment) {
-	numVolumes := len(deployment.Spec.Template.Spec.Volumes)
+func validateNewSecretVolumesAndMounts(t *testing.T, statefulset *appsv1.StatefulSet) {
+	numVolumes := len(statefulset.Spec.Template.Spec.Volumes)
 	if numVolumes != 1 {
 		t.Errorf("Incorrect number of volumes: expected 1, got %d", numVolumes)
 	}
 
-	volume := deployment.Spec.Template.Spec.Volumes[0]
+	volume := statefulset.Spec.Template.Spec.Volumes[0]
 	if volume.Name != "testfunc-projected-secrets" {
 		t.Errorf("Incorrect volume name: expected \"testfunc-projected-secrets\", got \"%s\"", volume.Name)
 	}
@@ -255,7 +255,7 @@ func validateNewSecretVolumesAndMounts(t *testing.T, deployment *appsv1.Deployme
 		t.Error("Project secret not constructed correctly")
 	}
 
-	c := deployment.Spec.Template.Spec.Containers[0]
+	c := statefulset.Spec.Template.Spec.Containers[0]
 	numVolumeMounts := len(c.VolumeMounts)
 	if numVolumeMounts != 1 {
 		t.Errorf("Incorrect number of volumes mounts: expected 1, got %d", numVolumeMounts)

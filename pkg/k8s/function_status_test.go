@@ -25,12 +25,12 @@ func Test_AsFunctionStatus(t *testing.T) {
 	envProcess := "process string here"
 	secrets := []string{"0-imagepullsecret", "1-genericsecret", "2-genericsecret"}
 
-	deploy := appsv1.Deployment{
+	deploy := appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
-		Spec: appsv1.DeploymentSpec{
+		Spec: appsv1.StatefulSetSpec{
 			Replicas: &replicas,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -80,7 +80,7 @@ func Test_AsFunctionStatus(t *testing.T) {
 				},
 			},
 		},
-		Status: appsv1.DeploymentStatus{
+		Status: appsv1.StatefulSetStatus{
 			AvailableReplicas: availableReplicas,
 		},
 	}

@@ -6,7 +6,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-// makeResources creates deployment resource limits and requests requirements from function specs
+// makeResources creates statefulset resource limits and requests requirements from function specs
 func makeResources(function *faasv1.Function) (*corev1.ResourceRequirements, error) {
 	resources := &corev1.ResourceRequirements{
 		Limits:   corev1.ResourceList{},

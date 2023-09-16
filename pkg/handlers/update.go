@@ -64,14 +64,14 @@ func MakeUpdateHandler(defaultNamespace string, factory k8s.FunctionFactory) htt
 			return
 		}
 
-		if err, status := updateDeploymentSpec(ctx, lookupNamespace, factory, request, annotations); err != nil {
+		if err, status := updateStatefulSetSpec(ctx, lookupNamespace, factory, request, annotations); err != nil {
 			if !k8s.IsNotFound(err) {
-				log.Printf("error updating deployment: %s.%s, error: %s\n", request.Service, lookupNamespace, err)
+				log.Printf("error updating StatefulSet: %s.%s, error: %s\n", request.Service, lookupNamespace, err)
 
 				return
 			}
 
-			wrappedErr := fmt.Errorf("unable update Deployment: %s.%s, error: %s", request.Service, lookupNamespace, err.Error())
+			wrappedErr := fmt.Errorf("unable update StatefulSet: %s.%s, error: %s", request.Service, lookupNamespace, err.Error())
 			http.Error(w, wrappedErr.Error(), status)
 			return
 		}
@@ -90,7 +90,7 @@ func MakeUpdateHandler(defaultNamespace string, factory k8s.FunctionFactory) htt
 	}
 }
 
-func updateDeploymentSpec(
+func updateStatefulSetSpec(
 	ctx context.Context,
 	functionNamespace string,
 	factory k8s.FunctionFactory,
@@ -99,25 +99,25 @@ func updateDeploymentSpec(
 
 	getOpts := metav1.GetOptions{}
 
-	deployment, findDeployErr := factory.Client.AppsV1().
-		Deployments(functionNamespace).
+	statefulset, findDeployErr := factory.Client.AppsV1().
+		StatefulSets(functionNamespace).
 		Get(context.TODO(), request.Service, getOpts)
 
 	if findDeployErr != nil {
 		return findDeployErr, http.StatusNotFound
 	}
 
-	if len(deployment.Spec.Template.Spec.Containers) > 0 {
-		deployment.Spec.Template.Spec.Containers[0].Image = request.Image
+	if len(statefulset.Spec.Template.Spec.Containers) > 0 {
+		statefulset.Spec.Template.Spec.Containers[0].Image = request.Image
 
-		deployment.Spec.Template.Spec.Containers[0].ImagePullPolicy = corev1.PullAlways
+		statefulset.Spec.Template.Spec.Containers[0].ImagePullPolicy = corev1.PullAlways
 
-		deployment.Spec.Template.Spec.Containers[0].Env = buildEnvVars(&request)
+		statefulset.Spec.Template.Spec.Containers[0].Env = buildEnvVars(&request)
 
-		factory.ConfigureReadOnlyRootFilesystem(request, deployment)
-		factory.ConfigureContainerUserID(deployment)
+		factory.ConfigureReadOnlyRootFilesystem(request, statefulset)
+		factory.ConfigureContainerUserID(statefulset)
 
-		deployment.Spec.Template.Spec.NodeSelector = createSelector(request.Constraints)
+		statefulset.Spec.Template.Spec.NodeSelector = createSelector(request.Constraints)
 
 		labels := map[string]string{
 			"faas_function": request.Service,
@@ -126,7 +126,7 @@ func updateDeploymentSpec(
 
 		if request.Labels != nil {
 			if min := getMinReplicaCount(*request.Labels); min != nil {
-				deployment.Spec.Replicas = min
+				statefulset.Spec.Replicas = min
 			}
 
 			for k, v := range *request.Labels {
@@ -134,22 +134,22 @@ func updateDeploymentSpec(
 			}
 		}
 
-		// deployment.Labels = labels
-		deployment.Spec.Template.ObjectMeta.Labels = labels
+		// statefulset.Labels = labels
+		statefulset.Spec.Template.ObjectMeta.Labels = labels
 
 		// store the current annotations so that we can diff the annotations
 		// and determine which profiles need to be removed
-		currentAnnotations := deployment.Annotations
-		deployment.Annotations = annotations
-		deployment.Spec.Template.Annotations = annotations
-		deployment.Spec.Template.ObjectMeta.Annotations = annotations
+		currentAnnotations := statefulset.Annotations
+		statefulset.Annotations = annotations
+		statefulset.Spec.Template.Annotations = annotations
+		statefulset.Spec.Template.ObjectMeta.Annotations = annotations
 
 		resources, resourceErr := createResources(request)
 		if resourceErr != nil {
 			return resourceErr, http.StatusBadRequest
 		}
 
-		deployment.Spec.Template.Spec.Containers[0].Resources = *resources
+		statefulset.Spec.Template.Spec.Containers[0].Resources = *resources
 
 		secrets := k8s.NewSecretsClient(factory.Client)
 		existingSecrets, err := secrets.GetSecrets(functionNamespace, request.Secrets)
@@ -157,7 +157,7 @@ func updateDeploymentSpec(
 			return err, http.StatusBadRequest
 		}
 
-		err = factory.ConfigureSecrets(request, deployment, existingSecrets)
+		err = factory.ConfigureSecrets(request, statefulset, existingSecrets)
 		if err != nil {
 			log.Println(err)
 			return err, http.StatusBadRequest
@@ -168,10 +168,10 @@ func updateDeploymentSpec(
 			return err, http.StatusBadRequest
 		}
 
-		deployment.Spec.Template.Spec.Containers[0].LivenessProbe = probes.Liveness
-		deployment.Spec.Template.Spec.Containers[0].ReadinessProbe = probes.Readiness
+		statefulset.Spec.Template.Spec.Containers[0].LivenessProbe = probes.Liveness
+		statefulset.Spec.Template.Spec.Containers[0].ReadinessProbe = probes.Readiness
 
-		// compare the annotations from args to the cache copy of the deployment annotations
+		// compare the annotations from args to the cache copy of the statefulset annotations
 		// at this point we have already updated the annotations to the new value, if we
 		// compare to that it will produce an empty list
 		profileNamespace := factory.Config.ProfilesNamespace
@@ -180,7 +180,7 @@ func updateDeploymentSpec(
 			return err, http.StatusBadRequest
 		}
 		for _, profile := range profileList {
-			factory.RemoveProfile(profile, deployment)
+			factory.RemoveProfile(profile, statefulset)
 		}
 
 		profileList, err = factory.GetProfiles(ctx, profileNamespace, annotations)
@@ -188,13 +188,13 @@ func updateDeploymentSpec(
 			return err, http.StatusBadRequest
 		}
 		for _, profile := range profileList {
-			factory.ApplyProfile(profile, deployment)
+			factory.ApplyProfile(profile, statefulset)
 		}
 	}
 
 	if _, updateErr := factory.Client.AppsV1().
-		Deployments(functionNamespace).
-		Update(context.TODO(), deployment, metav1.UpdateOptions{}); updateErr != nil {
+		StatefulSets(functionNamespace).
+		Update(context.TODO(), statefulset, metav1.UpdateOptions{}); updateErr != nil {
 
 		return updateErr, http.StatusInternalServerError
 	}

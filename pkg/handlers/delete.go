@@ -58,9 +58,9 @@ func MakeDeleteHandler(defaultNamespace string, clientset *kubernetes.Clientset)
 
 		getOpts := metav1.GetOptions{}
 
-		// This makes sure we don't delete non-labelled deployments
-		deployment, findDeployErr := clientset.AppsV1().
-			Deployments(lookupNamespace).
+		// This makes sure we don't delete non-labelled statefulsets
+		statefulset, findDeployErr := clientset.AppsV1().
+			StatefulSets(lookupNamespace).
 			Get(context.TODO(), request.FunctionName, getOpts)
 
 		if findDeployErr != nil {
@@ -74,7 +74,7 @@ func MakeDeleteHandler(defaultNamespace string, clientset *kubernetes.Clientset)
 			return
 		}
 
-		if isFunction(deployment) {
+		if isFunction(statefulset) {
 			err := deleteFunction(lookupNamespace, clientset, request, w)
 			if err != nil {
 				return
@@ -90,9 +90,9 @@ func MakeDeleteHandler(defaultNamespace string, clientset *kubernetes.Clientset)
 	}
 }
 
-func isFunction(deployment *appsv1.Deployment) bool {
-	if deployment != nil {
-		if _, found := deployment.Labels["faas_function"]; found {
+func isFunction(statefulset *appsv1.StatefulSet) bool {
+	if statefulset != nil {
+		if _, found := statefulset.Labels["faas_function"]; found {
 			return true
 		}
 	}
@@ -103,7 +103,7 @@ func deleteFunction(functionNamespace string, clientset *kubernetes.Clientset, r
 	foregroundPolicy := metav1.DeletePropagationForeground
 	opts := &metav1.DeleteOptions{PropagationPolicy: &foregroundPolicy}
 
-	if deployErr := clientset.AppsV1().Deployments(functionNamespace).
+	if deployErr := clientset.AppsV1().StatefulSets(functionNamespace).
 		Delete(context.TODO(), request.FunctionName, *opts); deployErr != nil {
 
 		if errors.IsNotFound(deployErr) {
@@ -112,7 +112,7 @@ func deleteFunction(functionNamespace string, clientset *kubernetes.Clientset, r
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 		w.Write([]byte(deployErr.Error()))
-		return fmt.Errorf("error deleting function's deployment")
+		return fmt.Errorf("error deleting function's statefulset")
 	}
 
 	if svcErr := clientset.CoreV1().

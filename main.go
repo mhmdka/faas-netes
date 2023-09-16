@@ -119,7 +119,7 @@ func main() {
 	}
 
 	// the sync interval does not affect the scale to/from zero feature
-	// auto-scaling is does via the HTTP API that acts on the deployment Spec.Replicas
+	// auto-scaling is does via the HTTP API that acts on the Statefulset Spec.Replicas
 	defaultResync := time.Minute * 5
 
 	namespaceScope := config.DefaultFunctionNamespace
@@ -151,7 +151,7 @@ func main() {
 
 type customInformers struct {
 	EndpointsInformer  v1core.EndpointsInformer
-	DeploymentInformer v1apps.DeploymentInformer
+	StatefulsetInformer v1apps.StatefulSetInformer
 	FunctionsInformer  v1.FunctionInformer
 }
 
@@ -168,9 +168,9 @@ func startInformers(setup serverSetup, stopCh <-chan struct{}, operator bool) cu
 		}
 	}
 
-	deployments := kubeInformerFactory.Apps().V1().Deployments()
-	go deployments.Informer().Run(stopCh)
-	if ok := cache.WaitForNamedCacheSync("faas-netes:deployments", stopCh, deployments.Informer().HasSynced); !ok {
+	statefulsets := kubeInformerFactory.Apps().V1().StatefulSets()
+	go statefulsets.Informer().Run(stopCh)
+	if ok := cache.WaitForNamedCacheSync("faas-netes:statefulsets", stopCh, statefulsets.Informer().HasSynced); !ok {
 		log.Fatalf("failed to wait for cache to sync")
 	}
 
@@ -182,7 +182,7 @@ func startInformers(setup serverSetup, stopCh <-chan struct{}, operator bool) cu
 
 	return customInformers{
 		EndpointsInformer:  endpoints,
-		DeploymentInformer: deployments,
+		StatefulsetInformer: statefulsets,
 		FunctionsInformer:  functions,
 	}
 }
@@ -197,7 +197,7 @@ func runController(setup serverSetup) {
 	stopCh := signals.SetupSignalHandler()
 	operator := false
 	listers := startInformers(setup, stopCh, operator)
-	controller.RegisterEventHandlers(listers.DeploymentInformer, kubeClient, config.DefaultFunctionNamespace)
+	controller.RegisterEventHandlers(listers.StatefulsetInformer, kubeClient, config.DefaultFunctionNamespace)
 
 	functionLookup := k8s.NewFunctionLookup(config.DefaultFunctionNamespace, listers.EndpointsInformer.Lister())
 
@@ -205,8 +205,8 @@ func runController(setup serverSetup) {
 		FunctionProxy:        proxy.NewHandlerFunc(config.FaaSConfig, functionLookup),
 		DeleteHandler:        handlers.MakeDeleteHandler(config.DefaultFunctionNamespace, kubeClient),
 		DeployHandler:        handlers.MakeDeployHandler(config.DefaultFunctionNamespace, factory),
-		FunctionReader:       handlers.MakeFunctionReader(config.DefaultFunctionNamespace, listers.DeploymentInformer.Lister()),
-		ReplicaReader:        handlers.MakeReplicaReader(config.DefaultFunctionNamespace, listers.DeploymentInformer.Lister()),
+		FunctionReader:       handlers.MakeFunctionReader(config.DefaultFunctionNamespace, listers.StatefulsetInformer.Lister()),
+		ReplicaReader:        handlers.MakeReplicaReader(config.DefaultFunctionNamespace, listers.StatefulsetInformer.Lister()),
 		ReplicaUpdater:       handlers.MakeReplicaUpdater(config.DefaultFunctionNamespace, kubeClient),
 		UpdateHandler:        handlers.MakeUpdateHandler(config.DefaultFunctionNamespace, factory),
 		HealthHandler:        handlers.MakeHealthHandler(),

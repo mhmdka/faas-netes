@@ -15,51 +15,51 @@ import (
 	"k8s.io/klog"
 )
 
-func RegisterEventHandlers(deploymentInformer v1apps.DeploymentInformer, kubeClient *kubernetes.Clientset, namespace string) {
-	deploymentInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+func RegisterEventHandlers(statefulsetInformer v1apps.StatefulSetInformer, kubeClient *kubernetes.Clientset, namespace string) {
+	statefulsetInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			deployment, ok := obj.(*appsv1.Deployment)
-			if !ok || deployment == nil {
+			statefulset, ok := obj.(*appsv1.StatefulSet)
+			if !ok || statefulset == nil {
 				return
 			}
-			if err := applyValidation(deployment, kubeClient); err != nil {
+			if err := applyValidation(statefulset, kubeClient); err != nil {
 				klog.Info(err)
 			}
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			deployment, ok := newObj.(*appsv1.Deployment)
-			if !ok || deployment == nil {
+			statefulset, ok := newObj.(*appsv1.StatefulSet)
+			if !ok || statefulset == nil {
 				return
 			}
-			if err := applyValidation(deployment, kubeClient); err != nil {
+			if err := applyValidation(statefulset, kubeClient); err != nil {
 				klog.Info(err)
 			}
 		},
 	})
 
-	list, err := deploymentInformer.Lister().Deployments(namespace).List(labels.Everything())
+	list, err := statefulsetInformer.Lister().StatefulSets(namespace).List(labels.Everything())
 	if err != nil {
 		klog.Info(err)
 		return
 	}
 
-	for _, deployment := range list {
-		if err := applyValidation(deployment, kubeClient); err != nil {
+	for _, statefulset := range list {
+		if err := applyValidation(statefulset, kubeClient); err != nil {
 			klog.Info(err)
 		}
 	}
 }
 
-func applyValidation(deployment *appsv1.Deployment, kubeClient *kubernetes.Clientset) error {
-	if deployment.Spec.Replicas == nil {
+func applyValidation(statefulset *appsv1.StatefulSet, kubeClient *kubernetes.Clientset) error {
+	if statefulset.Spec.Replicas == nil {
 		return nil
 	}
 
-	if _, ok := deployment.Spec.Template.Labels["faas_function"]; !ok {
+	if _, ok := statefulset.Spec.Template.Labels["faas_function"]; !ok {
 		return nil
 	}
 
-	current := *deployment.Spec.Replicas
+	current := *statefulset.Spec.Replicas
 	var target int
 	if current == 0 {
 		target = 1
@@ -68,17 +68,17 @@ func applyValidation(deployment *appsv1.Deployment, kubeClient *kubernetes.Clien
 	} else {
 		return nil
 	}
-	clone := deployment.DeepCopy()
+	clone := statefulset.DeepCopy()
 
 	value := int32(target)
 	clone.Spec.Replicas = &value
 
-	if _, err := kubeClient.AppsV1().Deployments(deployment.Namespace).
+	if _, err := kubeClient.AppsV1().StatefulSets(statefulset.Namespace).
 		Update(context.Background(), clone, metav1.UpdateOptions{}); err != nil {
 		if errors.IsConflict(err) {
 			return nil
 		}
-		return fmt.Errorf("error scaling %s to %d replicas: %w", deployment.Name, value, err)
+		return fmt.Errorf("error scaling %s to %d replicas: %w", statefulset.Name, value, err)
 	}
 
 	return nil
